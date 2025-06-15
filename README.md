@@ -2,7 +2,7 @@
 
 ## Descripción General
 
-Esta API proporciona los servicios backend para una aplicación de delivery de comida, manejando:
+Esta API proporciona los servicios backend para una aplicación de delivery de comida: https://github.com/Manuel01011/food-delivery-app, manejando:
 
 - Gestión de usuarios (clientes, repartidores)
 - Operaciones de restaurantes (registro, menús)
