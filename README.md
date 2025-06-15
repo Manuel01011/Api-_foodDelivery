@@ -1,7 +1,5 @@
 # 🚀 Documentación de API - Sistema de Delivery de Comida 🍔
 
-![Banner de Food Delivery](https://img.freepik.com/vector-gratis/plantilla-banner-comida-entregada_23-2148983004.jpg)
-
 ## 🌐 Descripción General
 
 Esta API proporciona los servicios backend para una aplicación de delivery de comida [🔗 GitHub](https://github.com/Manuel01011/food-delivery-app), manejando:
@@ -58,13 +56,3 @@ Esta API proporciona los servicios backend para una aplicación de delivery de c
 | **JSON (Gson)** | {} | Serialización de datos |
 | **Controller-Service** | 🏗️ | Patrón arquitectónico |
 | **Multi-threading** | 🧵 | Manejo de conexiones |
-
-## 🔄 Flujos Principales
-
-```mermaid
-graph TD
-    A[Cliente] -->|Verifica| B(Usuario)
-    B -->|Explora| C[Restaurantes]
-    C -->|Selecciona| D[Combos]
-    D -->|Realiza| E[Pedido]
-    E -->|Califica| F[Servicio]
