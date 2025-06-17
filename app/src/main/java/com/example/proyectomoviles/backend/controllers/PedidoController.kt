@@ -219,6 +219,52 @@ class PedidoController {
         }
     }
 
+    fun obtenerPedidosRepartidor(idRepartidor: Int, estado: String?): List<Map<String, Any>> {
+        val pedidos = mutableListOf<Map<String, Any>>()
+
+        try {
+            val connection = DatabaseDAO.getConnection()
+            val call = "{call sp_obtener_pedidos_repartidor_por_estado(?, ?)}"
+            val cs = connection!!.prepareCall(call)
+
+            cs.setInt(1, idRepartidor)
+            if (estado != null) {
+                cs.setString(2, estado)
+            } else {
+                cs.setNull(2, Types.VARCHAR)
+            }
+
+            val rs = cs.executeQuery()
+
+            while (rs.next()) {
+                val pedido = mapOf(
+                    "id_pedido" to rs.getInt("id_pedido"),
+                    "fecha_pedido" to rs.getTimestamp("fecha_pedido").toString(),
+                    "estado" to rs.getString("estado"),
+                    "total" to rs.getDouble("total"),
+                    "restaurante" to rs.getString("restaurante"),
+                    "direccion_restaurante" to rs.getString("direccion_restaurante"),
+                    "cliente" to rs.getString("cliente"),
+                    "direccion_entrega" to rs.getString("direccion_entrega"),
+                    "cantidad_items" to rs.getInt("cantidad_items"),
+                    "minutos_transcurridos" to rs.getInt("minutos_transcurridos"),
+                    "estado_descripcion" to rs.getString("estado_descripcion"),
+                    "ganancia_repartidor" to rs.getDouble("ganancia_repartidor")
+                )
+                pedidos.add(pedido)
+            }
+
+            rs.close()
+            cs.close()
+            connection.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+
+        return pedidos
+    }
+
     fun listarPedidosCliente(idCliente: Int, estado: String?): List<Map<String, Any>> {
         val conn = DatabaseDAO.getConncection()
         try {

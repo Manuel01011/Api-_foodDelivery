@@ -38,7 +38,8 @@ class UsuarioController {
                     cedula = cedula,
                     nombre = it.getString("nombre"),
                     tipo = it.getString("tipo"),
-                    estado = it.getString("estado")
+                    estado = it.getString("estado"),
+                    origen = it.getString("origen")
                 )
             } else {
                 null

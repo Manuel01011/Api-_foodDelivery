@@ -134,6 +134,31 @@ BEGIN
 END //
 DELIMITER ;
 
+-- ver el restaurante con mayor cantidad de pedidos
+CALL sp_listar_restaurantes_por_pedidos();
+
+DELIMITER //
+CREATE PROCEDURE sp_listar_restaurantes_por_pedidos()
+BEGIN
+    SELECT 
+        r.id_restaurante,
+        r.nombre,
+        r.tipo_comida,
+        COUNT(p.id_pedido) AS total_pedidos
+    FROM 
+        Restaurantes r
+    LEFT JOIN 
+        Pedidos p ON r.id_restaurante = p.id_restaurante 
+        AND p.estado != 'cancelado'
+    WHERE 
+        r.activo = TRUE
+    GROUP BY 
+        r.id_restaurante, r.nombre, r.tipo_comida
+    ORDER BY 
+        total_pedidos DESC;
+END //
+DELIMITER ;
+
 -- pruebas de pedido----
 select * from pedidos;
 CALL sp_crear_pedido_completo(
@@ -148,6 +173,102 @@ select * from pedidos;
 Select * from Usuarios;
 select * from repartidores;
 Select * from Calificaciones;
+
+
+-- obtener pedidos de un repartidor
+
+select * from repartidores;
+call sp_obtener_pedidos_repartidor_por_estado(7,'en_camino');
+drop procedure sp_obtener_pedidos_repartidor;
+
+DELIMITER //
+CREATE PROCEDURE sp_obtener_pedidos_repartidor_por_estado(
+    IN p_id_repartidor INT,
+    IN p_estado VARCHAR(20)
+)
+BEGIN
+    -- Si p_estado es NULL, muestra todos los pedidos
+    IF p_estado IS NULL THEN
+        SELECT 
+            p.id_pedido,
+            p.fecha_pedido,
+            p.estado,
+            p.total,
+            r.nombre AS restaurante,
+            r.direccion AS direccion_restaurante,
+            u.nombre AS cliente,
+            p.direccion_entrega,
+            COUNT(dp.id_detalle) AS cantidad_items,
+            TIMESTAMPDIFF(MINUTE, p.fecha_pedido, NOW()) AS minutos_transcurridos,
+            CASE 
+                WHEN p.estado = 'entregado' THEN 'Entregado'
+                WHEN p.estado = 'en_camino' THEN 'En camino'
+                WHEN p.estado = 'preparacion' THEN 'En preparación'
+                WHEN p.estado = 'pendiente' THEN 'Pendiente de recoger'
+                WHEN p.estado = 'cancelado' THEN 'Cancelado'
+            END AS estado_descripcion,
+            p.costo_transporte AS ganancia_repartidor
+        FROM 
+            Pedidos p
+        JOIN 
+            Restaurantes r ON p.id_restaurante = r.id_restaurante
+        JOIN 
+            Usuarios u ON p.id_cliente = u.id_usuario
+        LEFT JOIN 
+            Detalle_Pedidos dp ON p.id_pedido = dp.id_pedido
+        WHERE 
+            p.id_repartidor = p_id_repartidor
+        GROUP BY 
+            p.id_pedido
+        ORDER BY 
+            CASE 
+                WHEN p.estado = 'en_camino' THEN 1
+                WHEN p.estado = 'preparacion' THEN 2
+                WHEN p.estado = 'pendiente' THEN 3
+                ELSE 4
+            END,
+            p.fecha_pedido DESC;
+    ELSE
+        -- Si se especifica un estado, filtra por ese estado
+        SELECT 
+            p.id_pedido,
+            p.fecha_pedido,
+            p.estado,
+            p.total,
+            r.nombre AS restaurante,
+            r.direccion AS direccion_restaurante,
+            u.nombre AS cliente,
+            p.direccion_entrega,
+            COUNT(dp.id_detalle) AS cantidad_items,
+            TIMESTAMPDIFF(MINUTE, p.fecha_pedido, NOW()) AS minutos_transcurridos,
+            CASE 
+                WHEN p.estado = 'entregado' THEN 'Entregado'
+                WHEN p.estado = 'en_camino' THEN 'En camino'
+                WHEN p.estado = 'preparacion' THEN 'En preparación'
+                WHEN p.estado = 'pendiente' THEN 'Pendiente de recoger'
+                WHEN p.estado = 'cancelado' THEN 'Cancelado'
+            END AS estado_descripcion,
+            p.costo_transporte AS ganancia_repartidor
+        FROM 
+            Pedidos p
+        JOIN 
+            Restaurantes r ON p.id_restaurante = r.id_restaurante
+        JOIN 
+            Usuarios u ON p.id_cliente = u.id_usuario
+        LEFT JOIN 
+            Detalle_Pedidos dp ON p.id_pedido = dp.id_pedido
+        WHERE 
+            p.id_repartidor = p_id_repartidor
+            AND p.estado = p_estado
+        GROUP BY 
+            p.id_pedido
+        ORDER BY 
+            p.fecha_pedido DESC;
+    END IF;
+END //
+DELIMITER ;
+
+
 
 -- id el pedido y cliente
 CALL sp_obtener_detalle_pedido_completo(5, 22);
@@ -739,32 +860,64 @@ END //
 DELIMITER ;
 
 -- procedimiento para verificar su un usurio existe por cedula
+use foodorders;
+
+select * from calificaciones;
+select * from usuarios;
+select * from pedidos;
+select * from repartidores;
+select * from restaurantes;
+
+call sp_verificar_usuario(7777)
+drop procedure sp_verificar_usuario
+
 DELIMITER //
+
 CREATE PROCEDURE sp_verificar_usuario(
     IN p_cedula VARCHAR(20)
 )
 BEGIN
     -- Verificar usuario normal
     SELECT 
-        id_usuario,  -- Sin alias, o AS id_usuario
+        id_usuario,  
         nombre,
         tipo,
         estado,
         'usuario' AS origen
     FROM Usuarios 
-    WHERE cedula = p_cedula
+    WHERE cedula = p_cedula AND tipo != 'repartidor'
+
     UNION
+
     -- Verificar restaurante
     SELECT 
-        id_restaurante AS id_usuario,  -- Cambiado a id_usuario
+        id_restaurante AS id_usuario,  
         nombre,
         'restaurante' AS tipo,
         IF(activo, 'activo', 'suspendido') AS estado,
         'restaurante' AS origen
     FROM Restaurantes 
     WHERE cedula_juridica = p_cedula
+
+    UNION
+
+    -- Verificar repartidor (buscando por cédula en Usuarios y relacionando con Repartidores)
+    SELECT 
+        r.id_repartidor AS id_usuario,  -- Ahora devuelve el id_repartidor
+        u.nombre,
+        u.tipo,
+        CASE 
+            WHEN r.estado_disponibilidad = 'ocupado' THEN 'ocupado'
+            ELSE 'activo'
+        END AS estado,
+        'repartidor' AS origen
+    FROM Usuarios u
+    JOIN Repartidores r ON u.id_usuario = r.id_usuario
+    WHERE u.cedula = p_cedula AND u.tipo = 'repartidor'
+
     LIMIT 1;
 END //
+
 DELIMITER ;
 
 

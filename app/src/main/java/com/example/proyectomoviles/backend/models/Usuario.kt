@@ -10,5 +10,5 @@ data class Usuario(
     val numero_tarjeta: String = "",
     val tipo: String = "", // "cliente" o "repartidor"
     val estado: String = "activo" ,// "activo" o "suspendido"
-    val origen: String = ""
+    val origen: String? = null
 )

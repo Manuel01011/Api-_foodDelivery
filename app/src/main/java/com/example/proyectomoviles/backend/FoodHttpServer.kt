@@ -14,6 +14,7 @@ import com.example.proyectomoviles.backend.models.Usuario
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
@@ -102,6 +103,10 @@ class FoodHttpServer(private val port: Int) {
                 }
 
                 // Rutas para Restaurantes
+                path.equals("/api/reportes/restaurantes-populares", ignoreCase = true) && method == "GET" -> {
+                    handleReporteRestaurantesPopulares(writer)
+                }
+
                 path.equals("/api/restaurantes", ignoreCase = true) && method == "GET" -> {
                     handleObtenerRestaurantes(writer)
                 }
@@ -165,11 +170,14 @@ class FoodHttpServer(private val port: Int) {
                 path.equals("/api/repartidores", ignoreCase = true) && method == "POST" -> {
                     handleRegistrarRepartidor(writer, body)
                 }
+                path.startsWith("/api/repartidores/") && path.contains("/pedidos") && method == "GET" -> {
+                    val basePath = path.split('?')[0]
+                    val idRepartidor = basePath.removePrefix("/api/repartidores/").removeSuffix("/pedidos").toIntOrNull()
+                    val estado = getQueryParam(path, "estado")
+                    handleObtenerPedidosRepartidor(writer, idRepartidor, estado)
+                }
 
                 // Rutas para Reportes
-                path.equals("/api/reportes/restaurantes-populares", ignoreCase = true) && method == "GET" -> {
-                    handleReporteRestaurantesPopulares(writer)
-                }
                 path.equals("/api/reportes/ventas-restaurantes", ignoreCase = true) && method == "GET" -> {
                     handleReporteVentasRestaurantes(writer)
                 }
@@ -245,12 +253,12 @@ class FoodHttpServer(private val port: Int) {
             if (usuario != null) {
                 println("Detalles usuario: id=${usuario.id_usuario}, nombre=${usuario.nombre}, tipo=${usuario.tipo}, origen=${usuario.origen}")
 
-                val response = mapOf(
+                val response = mapOf<String, Any>(
                     "id_usuario" to usuario.id_usuario,
                     "nombre" to usuario.nombre,
                     "tipo" to usuario.tipo,
-                    "estado" to usuario.estado,
-                    "origen" to usuario.origen,
+                    "estado" to (usuario.estado ?: ""), // asegúrate de no enviar null
+                    "origen" to (usuario.origen ?: ""),
                     "cedula" to usuario.cedula
                 )
 
@@ -283,6 +291,26 @@ class FoodHttpServer(private val port: Int) {
             sendJsonResponse(writer, mapOf("success" to true, "restaurantes" to restaurantes))
         } catch (e: Exception) {
             sendErrorResponse(writer, "Error al obtener restaurantes: ${e.message}")
+        }
+    }
+
+    private fun handleReporteRestaurantesPopulares(writer: PrintWriter) {
+        try {
+            val restaurantes = restauranteController.obtenerRestaurantesPopulares()
+
+            // Agregar ranking
+            val rankedRestaurantes = restaurantes.mapIndexed { index, restaurante ->
+                restaurante + ("ranking" to (index + 1))
+            }
+
+            sendJsonResponse(writer, mapOf(
+                "success" to true,
+                "restaurantes" to rankedRestaurantes,
+                "total_restaurantes" to rankedRestaurantes.size,
+                "fecha_reporte" to System.currentTimeMillis()
+            ))
+        } catch (e: Exception) {
+            sendErrorResponse(writer, "Error al generar reporte: ${e.message}")
         }
     }
 
@@ -368,8 +396,6 @@ class FoodHttpServer(private val port: Int) {
         }
     }
 
-
-
     // ------------------------- Handlers para Pedidos -------------------------
     private fun handleCrearPedido(writer: PrintWriter, body: String) {
         try {
@@ -417,8 +443,12 @@ class FoodHttpServer(private val port: Int) {
         }
     }
 
-    fun sendJsonResponse(writer: PrintWriter, data: Any) {
-        val json = Gson().toJson(data)
+    private fun sendJsonResponse(writer: PrintWriter, response: JsonObject) {
+        val json = response.toString()
+        writer.println("HTTP/1.1 200 OK")
+        writer.println("Content-Type: application/json")
+        writer.println("Content-Length: ${json.toByteArray().size}")
+        writer.println()
         writer.println(json)
     }
 
@@ -559,6 +589,20 @@ class FoodHttpServer(private val port: Int) {
         }
     }
 
+    private fun handleObtenerPedidosRepartidor(writer: PrintWriter, idRepartidor: Int?, estado: String?) {
+        try {
+            if (idRepartidor == null) {
+                sendErrorResponse(writer, "ID de repartidor inválido")
+                return
+            }
+
+            val pedidos = pedidoController.obtenerPedidosRepartidor(idRepartidor, estado)
+            sendJsonResponse(writer, mapOf("success" to true, "pedidos" to pedidos))
+        } catch (e: Exception) {
+            sendErrorResponse(writer, "Error al obtener pedidos del repartidor: ${e.message}")
+        }
+    }
+
     private fun registrarUsuarioComoRepartidor(repartidor: RepartidorRegistroRequest): Int {
         val usuario = Usuario(
             id_usuario = 0, // Auto-generado
@@ -581,15 +625,6 @@ class FoodHttpServer(private val port: Int) {
 
 
     // ------------------------- Handlers para Reportes -------------------------
-    private fun handleReporteRestaurantesPopulares(writer: PrintWriter) {
-        try {
-            val restaurante = restauranteController.reporteRestaurantesPedidos("mayor")
-            sendJsonResponse(writer, mapOf("success" to true, "restaurante" to restaurante))
-        } catch (e: Exception) {
-            sendErrorResponse(writer, "Error al generar reporte: ${e.message}")
-        }
-    }
-
     private fun handleReporteVentasRestaurantes(writer: PrintWriter) {
         try {
             val ventas = restauranteController.reporteVentasRestaurantes()

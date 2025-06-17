@@ -139,5 +139,42 @@ class RestauranteController {
         return reporte
     }
 
+    // listar los restaurantes mas populares
+    fun obtenerRestaurantesPopulares(): List<Map<String, Any>> {
+        val restaurantes = mutableListOf<Map<String, Any>>()
+        try {
+            val connection = DatabaseDAO.getConnection()
+            val query = """
+            SELECT r.id_restaurante, r.nombre, r.tipo_comida, 
+                   COUNT(p.id_pedido) AS total_pedidos
+            FROM Restaurantes r
+            LEFT JOIN Pedidos p ON r.id_restaurante = p.id_restaurante 
+                AND p.estado != 'cancelado'
+            WHERE r.activo = TRUE
+            GROUP BY r.id_restaurante, r.nombre, r.tipo_comida
+            ORDER BY total_pedidos DESC
+        """
 
+            val statement = connection!!.createStatement()
+            val resultSet = statement.executeQuery(query)
+
+            while (resultSet.next()) {
+                val restaurante = mapOf(
+                    "id_restaurante" to resultSet.getInt("id_restaurante"),
+                    "nombre" to resultSet.getString("nombre"),
+                    "tipo_comida" to resultSet.getString("tipo_comida"),
+                    "total_pedidos" to resultSet.getInt("total_pedidos")
+                )
+                restaurantes.add(restaurante)
+            }
+
+            resultSet.close()
+            statement.close()
+            connection.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+        return restaurantes
+    }
 }
