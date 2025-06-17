@@ -265,6 +265,59 @@ class PedidoController {
         return pedidos
     }
 
+    fun obtenerClientesYPedidos(): Map<String, Any> {
+        val pedidos = mutableListOf<Map<String, Any>>()
+        var topCliente: Map<String, Any>? = null
+
+        try {
+            val connection = DatabaseDAO.getConnection()
+            val statement = connection!!.prepareCall("{ CALL sp_clientes_y_mayor_pedidos() }")
+            val hasResults = statement.execute()
+
+            // Resultado 1: pedidos por cliente
+            if (hasResults) {
+                val resultSet = statement.resultSet
+                while (resultSet.next()) {
+                    val row = mapOf(
+                        "id_usuario" to resultSet.getInt("id_usuario"),
+                        "nombre_cliente" to resultSet.getString("nombre_cliente"),
+                        "correo_cliente" to resultSet.getString("correo_cliente"),
+                        "id_pedido" to resultSet.getInt("id_pedido"),
+                        "fecha_pedido" to resultSet.getTimestamp("fecha_pedido").toString(),
+                        "total" to resultSet.getDouble("total")
+                    )
+                    pedidos.add(row)
+                }
+                resultSet.close()
+            }
+
+            if (statement.moreResults) {
+                val topResultSet = statement.resultSet
+                if (topResultSet.next()) {
+                    topCliente = mapOf(
+                        "id_usuario" to topResultSet.getInt("id_usuario"),
+                        "nombre_cliente" to topResultSet.getString("nombre_cliente"),
+                        "correo_cliente" to topResultSet.getString("correo_cliente"),
+                        "cantidad_pedidos" to topResultSet.getInt("cantidad_pedidos")
+                    )
+                }
+                topResultSet.close()
+            }
+
+            statement.close()
+            connection.close()
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+
+        return mapOf(
+            "pedidos" to pedidos,
+            "top" to (topCliente ?: mapOf<String, Any>())
+        )
+    }
+
     fun listarPedidosCliente(idCliente: Int, estado: String?): List<Map<String, Any>> {
         val conn = DatabaseDAO.getConncection()
         try {

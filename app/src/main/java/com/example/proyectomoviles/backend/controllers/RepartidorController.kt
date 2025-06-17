@@ -96,5 +96,36 @@ class RepartidorController {
         return reporte
     }
 
+    fun obtenerCalificacionesRepartidores(): List<Map<String, Any>> {
+        val calificaciones = mutableListOf<Map<String, Any>>()
+
+        try {
+            val connection = DatabaseDAO.getConnection()
+            val statement = connection!!.prepareCall("{ CALL obtener_calificaciones_repartidores() }")
+            val resultSet = statement.executeQuery()
+
+            while (resultSet.next()) {
+                val calificacion = mapOf(
+                    "id_repartidor" to resultSet.getInt("id_repartidor"),
+                    "nombre_repartidor" to resultSet.getString("nombre_repartidor"),
+                    "puntaje_repartidor" to resultSet.getInt("puntaje_repartidor"),
+                    "comentario" to resultSet.getString("comentario"),
+                    "queja" to resultSet.getBoolean("queja"),
+                    "id_pedido" to resultSet.getInt("id_pedido")
+                )
+                calificaciones.add(calificacion)
+            }
+
+            resultSet.close()
+            statement.close()
+            connection.close()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            throw e
+        }
+
+        return calificaciones
+    }
+
 }
 

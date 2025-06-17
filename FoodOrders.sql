@@ -134,6 +134,27 @@ BEGIN
 END //
 DELIMITER ;
 
+-- obtener las calificaciones por cada repartidor
+CALL obtener_calificaciones_repartidores();
+select * from calificaciones
+
+DELIMITER $$
+CREATE PROCEDURE obtener_calificaciones_repartidores()
+BEGIN
+    SELECT 
+        r.id_repartidor,
+        u.nombre AS nombre_repartidor,
+        c.puntaje_repartidor,
+        c.comentario,
+        c.queja,
+        c.id_pedido
+    FROM Calificaciones c
+    INNER JOIN Repartidores r ON c.id_repartidor = r.id_repartidor
+    INNER JOIN Usuarios u ON r.id_usuario = u.id_usuario
+    ORDER BY r.id_repartidor, c.id_calificacion;
+END $$
+DELIMITER ;
+
 -- ver el restaurante con mayor cantidad de pedidos
 CALL sp_listar_restaurantes_por_pedidos();
 
@@ -158,6 +179,43 @@ BEGIN
         total_pedidos DESC;
 END //
 DELIMITER ;
+
+-- Restaurantes y sus ventas
+CALL sp_ventas_por_restaurante_simple();
+
+DELIMITER //
+CREATE PROCEDURE sp_ventas_por_restaurante_simple()
+BEGIN
+    -- Calcular el total general primero
+    SET @total_general = (
+        SELECT SUM(p.total) 
+        FROM Pedidos p
+        JOIN Restaurantes r ON p.id_restaurante = r.id_restaurante
+        WHERE r.activo = TRUE AND p.estado != 'cancelado'
+    );
+    
+    -- Consulta principal con cálculo directo del porcentaje
+    SELECT 
+        r.id_restaurante,
+        r.nombre AS nombre_restaurante,
+        r.tipo_comida,
+        SUM(p.total) AS total_vendido,
+        ROUND((SUM(p.total) / NULLIF(@total_general, 0)) * 100, 2) AS porcentaje_total,
+        @total_general AS ventas_totales_generales
+    FROM 
+        Restaurantes r
+    JOIN 
+        Pedidos p ON r.id_restaurante = p.id_restaurante
+    WHERE 
+        r.activo = TRUE
+        AND p.estado != 'cancelado'
+    GROUP BY 
+        r.id_restaurante, r.nombre, r.tipo_comida
+    ORDER BY 
+        total_vendido DESC;
+END //
+DELIMITER ;
+
 
 -- pruebas de pedido----
 select * from pedidos;
@@ -1101,7 +1159,41 @@ BEGIN
 END //
 DELIMITER ;
 
-drop procedure sp_crear_pedido
+
+-- clientes y sus pedidos
+CALL sp_clientes_y_mayor_pedidos();
+
+DELIMITER $$
+CREATE PROCEDURE sp_clientes_y_mayor_pedidos()
+BEGIN
+    -- Parte 1: Listado de pedidos por cliente
+    SELECT 
+        u.id_usuario,
+        u.nombre AS nombre_cliente,
+        u.correo AS correo_cliente,
+        p.id_pedido,
+        p.fecha_pedido,
+        p.total
+    FROM Usuarios u
+    INNER JOIN Pedidos p ON u.id_usuario = p.id_cliente
+    WHERE u.tipo = 'cliente'
+    ORDER BY u.id_usuario, p.fecha_pedido ASC;
+
+    -- Parte 2: Cliente con mayor cantidad de pedidos
+    SELECT 
+        u.id_usuario,
+        u.nombre AS nombre_cliente,
+        u.correo AS correo_cliente,
+        COUNT(p.id_pedido) AS cantidad_pedidos
+    FROM Usuarios u
+    INNER JOIN Pedidos p ON u.id_usuario = p.id_cliente
+    WHERE u.tipo = 'cliente'
+    GROUP BY u.id_usuario, u.nombre, u.correo
+    ORDER BY cantidad_pedidos DESC
+    LIMIT 1;
+END$$
+DELIMITER ;
+
 -- Crear nuevo pedido
 DELIMITER //
 CREATE PROCEDURE sp_crear_pedido(
@@ -1262,20 +1354,6 @@ BEGIN
 END //
 DELIMITER ;
 
--- Reporte de ventas por restaurante
-DELIMITER //
-CREATE PROCEDURE sp_reporte_ventas_restaurantes()
-BEGIN
-    SELECT 
-        r.id_restaurante,
-        r.nombre,
-        COUNT(p.id_pedido) AS total_pedidos,
-        SUM(p.total) AS total_ventas
-    FROM Restaurantes r
-    LEFT JOIN Pedidos p ON r.id_restaurante = p.id_restaurante
-    GROUP BY r.id_restaurante, r.nombre;
-END //
-DELIMITER ;
 
 -- Reporte de clientes (activos/suspendidos)
 DELIMITER //

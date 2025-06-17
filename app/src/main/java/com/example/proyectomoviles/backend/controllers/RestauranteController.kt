@@ -3,6 +3,7 @@ package com.example.proyectomoviles.backend.controllers
 import com.example.proyectomoviles.backend.models.Combo
 import com.example.proyectomoviles.backend.models.ComboRequest
 import com.example.proyectomoviles.backend.models.Restaurante
+import com.example.proyectomoviles.backend.models.RestauranteReporte
 import com.example.proyectomoviles.backend.service.DatabaseDAO
 
 class RestauranteController {
@@ -118,25 +119,26 @@ class RestauranteController {
         } ?: throw Exception("Error al generar reporte")
     }
 
-    // Reporte de ventas por restaurante
-    fun reporteVentasRestaurantes(): List<Map<String, Any>> {
-        val procedureName = "sp_reporte_ventas_restaurantes"
+    fun reporteVentasRestaurantes(): List<RestauranteReporte> {
+        val procedureName = "sp_ventas_por_restaurante_simple"
         val result = DatabaseDAO.executeStoredProcedureWithResults(procedureName)
 
-        val reporte = mutableListOf<Map<String, Any>>()
+        val lista = mutableListOf<RestauranteReporte>()
+
         result?.let {
             while (it.next()) {
-                reporte.add(
-                    mapOf(
-                        "id_restaurante" to it.getInt("id_restaurante"),
-                        "nombre" to it.getString("nombre"),
-                        "total_pedidos" to it.getInt("total_pedidos"),
-                        "total_ventas" to it.getDouble("total_ventas")
-                    )
+                val restaurante = RestauranteReporte(
+                    idRestaurante = it.getInt("id_restaurante"),
+                    nombreRestaurante = it.getString("nombre_restaurante"),
+                    tipoComida = it.getString("tipo_comida"),
+                    totalVendido = it.getDouble("total_vendido"),
+                    porcentajeTotal = it.getDouble("porcentaje_total"),
+                    ventasTotalesGenerales = it.getDouble("ventas_totales_generales")
                 )
+                lista.add(restaurante)
             }
-        }
-        return reporte
+            return lista
+        } ?: throw Exception("Error al generar reporte")
     }
 
     // listar los restaurantes mas populares

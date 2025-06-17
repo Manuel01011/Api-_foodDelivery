@@ -1,6 +1,5 @@
 package com.example.proyectomoviles.backend
 
-import android.widget.Toast
 import com.example.proyectomoviles.backend.controllers.PedidoController
 import com.example.proyectomoviles.backend.controllers.RepartidorController
 import com.example.proyectomoviles.backend.controllers.RestauranteController
@@ -14,7 +13,6 @@ import com.example.proyectomoviles.backend.models.Usuario
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.PrintWriter
@@ -101,12 +99,17 @@ class FoodHttpServer(private val port: Int) {
                 path.equals("/api/clientes", ignoreCase = true) && method == "GET" -> {
                     handleObtenerClientes(writer)
                 }
+                path.equals("/api/reportes/clientes-pedidos", ignoreCase = true) && method == "GET" -> {
+                    handleReporteClientesYPedidos(writer)
+                }
 
                 // Rutas para Restaurantes
                 path.equals("/api/reportes/restaurantes-populares", ignoreCase = true) && method == "GET" -> {
                     handleReporteRestaurantesPopulares(writer)
                 }
-
+                path.equals("/api/reportes/calificaciones-repartidores", ignoreCase = true) && method == "GET" -> {
+                    handleReporteCalificacionesRepartidores(writer)
+                }
                 path.equals("/api/restaurantes", ignoreCase = true) && method == "GET" -> {
                     handleObtenerRestaurantes(writer)
                 }
@@ -284,6 +287,25 @@ class FoodHttpServer(private val port: Int) {
         }
     }
 
+    private fun handleReporteClientesYPedidos(writer: PrintWriter) {
+        try {
+            val resultado = pedidoController.obtenerClientesYPedidos()
+
+            val pedidos = resultado["pedidos"] as? List<Map<String, Any>> ?: emptyList()
+            val top = resultado["top"] as? Map<String, Any> ?: emptyMap()
+
+            sendJsonResponse(writer, mapOf(
+                "success" to true,
+                "pedidos_por_cliente" to pedidos,
+                "cliente_top" to top,
+                "fecha_reporte" to System.currentTimeMillis()
+            ))
+        } catch (e: Exception) {
+            sendErrorResponse(writer, "Error al obtener reporte: ${e.message}")
+        }
+    }
+
+
     // ------------------------- Handlers para Restaurantes -------------------------
     private fun handleObtenerRestaurantes(writer: PrintWriter) {
         try {
@@ -311,6 +333,21 @@ class FoodHttpServer(private val port: Int) {
             ))
         } catch (e: Exception) {
             sendErrorResponse(writer, "Error al generar reporte: ${e.message}")
+        }
+    }
+
+    private fun handleReporteCalificacionesRepartidores(writer: PrintWriter) {
+        try {
+            val calificaciones = repartidorController.obtenerCalificacionesRepartidores()
+
+            sendJsonResponse(writer, mapOf(
+                "success" to true,
+                "calificaciones" to calificaciones,
+                "total_calificaciones" to calificaciones.size,
+                "fecha_reporte" to System.currentTimeMillis()
+            ))
+        } catch (e: Exception) {
+            sendErrorResponse(writer, "Error al obtener calificaciones: ${e.message}")
         }
     }
 
@@ -625,10 +662,11 @@ class FoodHttpServer(private val port: Int) {
 
 
     // ------------------------- Handlers para Reportes -------------------------
+
     private fun handleReporteVentasRestaurantes(writer: PrintWriter) {
         try {
-            val ventas = restauranteController.reporteVentasRestaurantes()
-            sendJsonResponse(writer, mapOf("success" to true, "ventas" to ventas))
+            val reporte = restauranteController.reporteVentasRestaurantes()
+            sendJsonResponse(writer, mapOf("success" to true, "reporte" to reporte))
         } catch (e: Exception) {
             sendErrorResponse(writer, "Error al generar reporte de ventas: ${e.message}")
         }
